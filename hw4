@@ -1,0 +1,81 @@
+library(shiny)
+library(plotly)
+library(COVID19)
+library(quantmod)
+library(DMwR)
+library(shinydashboard)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "COVID-19 Data"),
+  
+  dashboardSidebar(disable = TRUE),
+  
+  dashboardBody(
+    fluidRow(
+      tabBox(
+        title = "covid19 and economic data", 
+        height = "500px",
+        width = 12,
+        tabPanel("covid-19 and economic data", 
+                 column(2,
+                        selectInput("country", label = "Country", multiple = TRUE,   choices = unique(covid19()$administrative_area_level_1), selected = "Italy"),
+                        selectInput("type", label = "type", choices = c("confirmed", "recovered", "deaths")),
+                        selectInput('economy',label = 'economy',choices = c("TSLA", "GOOGL", "NVDA")),
+                        dateRangeInput("date", label = "Date", start = "2020-01-01")),
+                 
+                 column(4,plotlyOutput("covid19plot")),
+                 column(4,plotOutput("economyplot"))),
+        tabPanel("combination", plotOutput("combination"))
+      )
+      
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  output$covid19plot <- renderPlotly({
+    if(!is.null(input$country)){
+      x <- covid19(country = input$country, level = 1, start = input$date[1], end = input$date[2])
+      color <- paste0("administrative_area_level_")
+      plot_ly(x = x[["date"]], y = x[[input$type]], color = x[[color]])
+    }
+  })
+  
+  
+  
+  output$economyplot <- renderPlot({
+    if(!is.null(input$economy)){
+      getSymbols("TSLA",src = "yahoo", from = input$date[1], to = input$date[2])
+      getSymbols("GOOGL",src = "yahoo", from = input$date[1], to = input$date[2])
+      getSymbols("NVDA",src = "yahoo", from = input$date[1], to = input$date[2])
+      if(input$economy=="TSLA"){
+        plot(x = index(TSLA), y = TSLA$TSLA.Close,type = "l",lwd = 5)
+      }
+      if(input$economy=="GOOGL"){
+        plot(x = index(GOOGL), y = GOOGL$GOOGL.Close,type = "l",lwd = 5)
+      }
+      if(input$economy=="NVDA"){
+        plot(x = index(NVDA), y = NVDA$NVDA.Close,type = "l",lwd = 5)
+      }
+    }
+  })
+  
+  output$combination <- renderPlot({
+    x <- covid19(country = input$country, level = 1, start = input$date[1], end = input$date[2])
+    getSymbols("TSLA",src = "yahoo", from = input$date[1], to = input$date[2])
+    getSymbols("GOOGL",src = "yahoo", from = input$date[1], to = input$date[2])
+    getSymbols("NVDA",src = "yahoo", from = input$date[1], to = input$date[2])
+    if(input$economy=="TSLA"){
+      plot(x = index(TSLA), y = x[[input$type]])
+    }
+    if(input$economy=="GOOGL"){
+      plot(x = index(GOOGL), y = x[[input$type]])
+    }
+    if(input$economy=="NVDA"){
+      plot(x = index(NVDA), y = x[[input$type]])
+    }
+  })
+}
+
+shinyApp(ui = ui, server = server)
